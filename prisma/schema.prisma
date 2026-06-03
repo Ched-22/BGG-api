@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TECHNICIAN
+}
+
+enum AppointmentStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  password     String
+  role         Role     @default(TECHNICIAN)
+  createdAt    DateTime @default(now())
+  appointments Appointment[]
+}
+
+model Client {
+  id        String    @id @default(uuid())
+  name      String
+  phone     String
+  email     String?
+  createdAt DateTime  @default(now())
+  vehicles  Vehicle[]
+}
+
+model Vehicle {
+  id           String       @id @default(uuid())
+  plate        String       @unique
+  brand        String
+  model        String
+  year         Int
+  color        String?
+  clientId     String
+  client       Client       @relation(fields: [clientId], references: [id])
+  appointments Appointment[]
+}
+
+model Service {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  duration    Int     // minutos
+  active      Boolean @default(true)
+}
+
+model Appointment {
+  id          String            @id @default(uuid())
+  scheduledAt DateTime
+  status      AppointmentStatus @default(PENDING)
+  notes       String?
+  vehicleId   String
+  vehicle     Vehicle           @relation(fields: [vehicleId], references: [id])
+  userId      String
+  user        User              @relation(fields: [userId], references: [id])
+  checklist   Checklist?
+  createdAt   DateTime          @default(now())
+}
+
+model Checklist {
+  id            String           @id @default(uuid())
+  appointmentId String           @unique
+  appointment   Appointment      @relation(fields: [appointmentId], references: [id])
+  notes         String?
+  completedAt   DateTime?
+  items         ChecklistItem[]
+}
+
+model ChecklistItem {
+  id          String    @id @default(uuid())
+  description String
+  done        Boolean   @default(false)
+  photoUrl    String?   // URL do S3
+  checklistId String
+  checklist   Checklist @relation(fields: [checklistId], references: [id])
+}
