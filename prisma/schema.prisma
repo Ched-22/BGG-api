@@ -12,6 +12,12 @@ enum Role {
   TECHNICIAN
 }
 
+enum QuoteStatus {
+  DRAFT
+  PENDING
+  APPROVED
+}
+
 enum AppointmentStatus {
   PENDING
   IN_PROGRESS
@@ -88,4 +94,28 @@ model ChecklistItem {
   photoUrl    String?   // URL do S3
   checklistId String
   checklist   Checklist @relation(fields: [checklistId], references: [id])
+}
+
+model Quote {
+  id          String      @id @default(uuid())
+  status      QuoteStatus @default(DRAFT)
+  clientName  String
+  clientPhone String
+  clientEmail String?
+  plate       String
+  brand       String
+  model       String
+  year        Int
+  color       String?
+  km          Int?
+  vehicleSize String?
+  services    Json        // array de serviços seleccionados
+  discount    Float       @default(0)
+  total       Float       @default(0)
+  notes       String?
+  internalNote String?
+  submittedAt DateTime?
+  approvedAt  DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 }
