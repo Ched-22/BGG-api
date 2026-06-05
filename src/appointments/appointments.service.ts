@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { assertNoScheduleConflict } from './appointment-schedule.util';
 
 const userSelect = {
   select: {
@@ -16,11 +17,17 @@ const userSelect = {
 
 @Injectable()
 export class AppointmentsService {
-  constructor(private prisma: PrismaService,
-  private notificationsService: NotificationsService,
+  private readonly logger = new Logger(AppointmentsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateAppointmentDto) {
+    const scheduledAt = new Date(dto.scheduledAt);
+    await assertNoScheduleConflict(this.prisma, dto.userId, scheduledAt);
+
     const appointment = await this.prisma.appointment.create({
       data: {
         ...dto,
@@ -96,12 +103,25 @@ export class AppointmentsService {
   }
 
   async update(id: string, dto: UpdateAppointmentDto) {
-    await this.findOne(id);
+    const current = await this.findOne(id);
+    const userId = dto.userId ?? current.userId;
+    const scheduledAt = dto.scheduledAt
+      ? new Date(dto.scheduledAt)
+      : current.scheduledAt;
+
+    await assertNoScheduleConflict(
+      this.prisma,
+      userId,
+      scheduledAt,
+      id,
+    );
+
     return this.prisma.appointment.update({
       where: { id },
       data: {
         ...dto,
-        ...(dto.scheduledAt && { scheduledAt: new Date(dto.scheduledAt) }),
+        ...(dto.scheduledAt && { scheduledAt }),
+        ...(dto.userId && { userId: dto.userId }),
       },
       include: {
         vehicle: { include: { client: true } },

@@ -8,12 +8,14 @@ import { AppointmentsModule } from './appointments/appointments.module';
 import { ChecklistsModule } from './checklists/checklists.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { QuotesModule } from './quotes/quotes.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AuthModule,
+    UsersModule,
     ClientsModule,
     VehiclesModule,
     AppointmentsModule,

@@ -26,13 +26,20 @@ enum AppointmentStatus {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  name         String
-  email        String   @unique
-  password     String
-  role         Role     @default(TECHNICIAN)
-  createdAt    DateTime @default(now())
-  appointments Appointment[]
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  password      String
+  role          Role     @default(TECHNICIAN)
+  active        Boolean  @default(true)
+  phone         String?
+  startedAt     DateTime?
+  skills        String[] @default([])
+  available     Boolean  @default(true)
+  scheduleLabel String?
+  workloadHours Int      @default(0)
+  createdAt     DateTime @default(now())
+  appointments  Appointment[]
 }
 
 model Client {
