@@ -1,14 +1,31 @@
-## Summary
+# feat(auth): allow technician view access in admin with role guards
 
-- Add technician profile fields on `User` and `/api/users/technicians` CRUD (paginated list, detail, soft-deactivate, `GET /me` for technicians).
-- Compute KPIs (`completedCount`, `utilizationPercent`, `rating`) and `hasScheduleConflict` on the server; block duplicate `scheduledAt` on appointment create/update (`409`).
-- Integrate BGG-Admin **Técnicos** page with the API; keep **Tarefas designadas** on `BGG_DATA.tasks` mock.
+## Feature Summary
+
+Technicians can log into BGG-Admin and browse in read-only mode; quotes remain writable. API role guards enforce GET for technicians on tasks/inventory and restrict approve/delete on quotes.
+
+**ClickUp task:** N/A
+
+## Problem
+
+- Technicians were blocked from the admin console after login.
+- API returned 403 on tasks/inventory for technician JWTs.
+- No server-side restriction on quote approve/delete for non-admins.
+
+## Implementation Details
+
+**API**
+- `GET /tasks`, `GET /inventory/products` → `ADMIN` + `TECHNICIAN`
+- `POST/PATCH/DELETE` on tasks, inventory → `ADMIN` only
+- `quotes` controller: `RolesGuard` — approve/delete `ADMIN` only; create/update/submit both roles
+- `clients`, `appointments`: GET both roles; writes `ADMIN` only
+
+## Risk
+
+**Low** — authorization tightening; no schema changes.
 
 ## Test plan
 
-- [ ] Run migration: `npx prisma migrate deploy` (or `migrate dev`)
-- [ ] Login as admin → Técnicos → list, create technician, open detail
-- [ ] Verify appointments table in detail; tasks table still mock
-- [ ] Create two appointments same `scheduledAt` for one technician → second returns `409`
-- [ ] `npm test` / `npm run build` in `bgggarage-api`
-- [ ] Technician JWT → `GET /api/users/technicians/me` returns own profile
+- [ ] Technician JWT: `GET /tasks` → 200, `PATCH /tasks/:id` → 403
+- [ ] Technician: `POST /quotes` → 201, `PATCH /quotes/:id/approve` → 403
+- [ ] Admin: full access unchanged

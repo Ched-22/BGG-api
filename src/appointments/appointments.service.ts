@@ -1,9 +1,17 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { Appointment, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { assertNoScheduleConflict } from './appointment-schedule.util';
+
+type AuthUser = { id: string; email: string; role: Role };
 
 const userSelect = {
   select: {
@@ -13,6 +21,11 @@ const userSelect = {
     role: true,
     createdAt: true,
   },
+};
+
+const appointmentInclude = {
+  vehicle: { include: { client: true } },
+  user: userSelect,
 };
 
 @Injectable()
@@ -34,8 +47,8 @@ export class AppointmentsService {
         scheduledAt: new Date(dto.scheduledAt),
       },
       include: {
-        vehicle: { include: { client: true } },
-        user: userSelect,
+        ...appointmentInclude,
+        checklist: true,
       },
     });
     await this.notificationsService.sendAppointmentConfirmation(
@@ -48,42 +61,42 @@ export class AppointmentsService {
     return appointment;
   }
 
-  async findAll() {
+  async findAll(user: AuthUser) {
     return this.prisma.appointment.findMany({
+      where: this.scopeForUser(user),
       include: {
-        vehicle: { include: { client: true } },
-        user: userSelect,
+        ...appointmentInclude,
         checklist: true,
       },
       orderBy: { scheduledAt: 'desc' },
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: AuthUser) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
       include: {
-        vehicle: { include: { client: true } },
-        user: userSelect,
+        ...appointmentInclude,
         checklist: { include: { items: true } },
       },
     });
     if (!appointment) throw new NotFoundException('Agendamento não encontrado');
+    if (user) this.assertCanAccess(appointment, user);
     return appointment;
   }
 
-  async findByStatus(status: string) {
+  async findByStatus(status: string, user: AuthUser) {
     return this.prisma.appointment.findMany({
-      where: { status: status as any },
-      include: {
-        vehicle: { include: { client: true } },
-        user: userSelect,
+      where: {
+        status: status as any,
+        ...this.scopeForUser(user),
       },
+      include: appointmentInclude,
       orderBy: { scheduledAt: 'asc' },
     });
   }
 
-  async findToday() {
+  async findToday(user: AuthUser) {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     const end = new Date();
@@ -92,46 +105,76 @@ export class AppointmentsService {
     return this.prisma.appointment.findMany({
       where: {
         scheduledAt: { gte: start, lte: end },
+        ...this.scopeForUser(user),
       },
       include: {
-        vehicle: { include: { client: true } },
-        user: userSelect,
+        ...appointmentInclude,
         checklist: true,
       },
       orderBy: { scheduledAt: 'asc' },
     });
   }
 
-  async update(id: string, dto: UpdateAppointmentDto) {
-    const current = await this.findOne(id);
-    const userId = dto.userId ?? current.userId;
-    const scheduledAt = dto.scheduledAt
-      ? new Date(dto.scheduledAt)
+  async update(id: string, dto: UpdateAppointmentDto, user: AuthUser) {
+    const current = await this.getAppointmentOrThrow(id);
+    this.assertCanAccess(current, user);
+
+    const data =
+      user.role === Role.TECHNICIAN
+        ? this.pickTechnicianUpdate(dto)
+        : dto;
+
+    const userId = data.userId ?? current.userId;
+    const scheduledAt = data.scheduledAt
+      ? new Date(data.scheduledAt)
       : current.scheduledAt;
 
-    await assertNoScheduleConflict(
-      this.prisma,
-      userId,
-      scheduledAt,
-      id,
-    );
+    if (user.role === Role.ADMIN) {
+      await assertNoScheduleConflict(this.prisma, userId, scheduledAt, id);
+    }
 
     return this.prisma.appointment.update({
       where: { id },
       data: {
-        ...dto,
-        ...(dto.scheduledAt && { scheduledAt }),
-        ...(dto.userId && { userId: dto.userId }),
+        ...data,
+        ...(data.scheduledAt && { scheduledAt }),
+        ...(data.userId && { userId: data.userId }),
       },
-      include: {
-        vehicle: { include: { client: true } },
-        user: userSelect,
-      },
+      include: appointmentInclude,
     });
   }
 
   async remove(id: string) {
-    await this.findOne(id);
+    await this.getAppointmentOrThrow(id);
     return this.prisma.appointment.delete({ where: { id } });
+  }
+
+  private scopeForUser(user: AuthUser) {
+    if (user.role === Role.TECHNICIAN) {
+      return { userId: user.id };
+    }
+    return {};
+  }
+
+  private async getAppointmentOrThrow(id: string): Promise<Appointment> {
+    const appointment = await this.prisma.appointment.findUnique({
+      where: { id },
+    });
+    if (!appointment) throw new NotFoundException('Agendamento não encontrado');
+    return appointment;
+  }
+
+  private assertCanAccess(appointment: Appointment, user: AuthUser) {
+    if (user.role !== Role.TECHNICIAN) return;
+    if (appointment.userId !== user.id) {
+      throw new ForbiddenException('Sem permissão para aceder a este agendamento');
+    }
+  }
+
+  private pickTechnicianUpdate(dto: UpdateAppointmentDto) {
+    const allowed: UpdateAppointmentDto = {};
+    if (dto.status !== undefined) allowed.status = dto.status;
+    if (dto.notes !== undefined) allowed.notes = dto.notes;
+    return allowed;
   }
 }

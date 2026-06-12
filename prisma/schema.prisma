@@ -29,7 +29,8 @@ model User {
   id            String   @id @default(uuid())
   name          String
   email         String   @unique
-  password      String
+  password      String?
+  googleId      String?  @unique
   role          Role     @default(TECHNICIAN)
   active        Boolean  @default(true)
   phone         String?
@@ -40,15 +41,24 @@ model User {
   workloadHours Int      @default(0)
   createdAt     DateTime @default(now())
   appointments  Appointment[]
+  quotes        Quote[]  @relation("QuoteCreatedBy")
 }
 
 model Client {
-  id        String    @id @default(uuid())
-  name      String
-  phone     String
-  email     String?
-  createdAt DateTime  @default(now())
-  vehicles  Vehicle[]
+  id          String    @id @default(uuid())
+  name        String
+  phone       String
+  email       String?
+  status      String    @default("Ativo")
+  addressUnit String?
+  street      String?
+  city        String?
+  state       String?
+  zipCode     String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  vehicles    Vehicle[]
+  tasks       Task[]
 }
 
 model Vehicle {
@@ -103,6 +113,51 @@ model ChecklistItem {
   checklist   Checklist @relation(fields: [checklistId], references: [id])
 }
 
+model InventoryProduct {
+  id              String   @id @default(uuid())
+  sku             String   @unique
+  name            String
+  category        String
+  unit            String
+  currentQuantity Int      @default(0)
+  maxCapacity     Int
+  supplier        String?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Task {
+  id                 String   @id @default(uuid())
+  displayId          String   @unique
+  projeto            String
+  cliente            String
+  clienteEmail       String?
+  clienteTel         String?
+  servico            String
+  status             String   @default("Não agendado")
+  descricao          String
+  anotInternas       String?
+  anotPropriedade    String?
+  endereco           Json?
+  dataAgendada       String?
+  horario            String?
+  baia               Int?
+  duracaoHoras       Float?
+  tecnico            String?
+  tecnicoStatus      String   @default("—")
+  tecnicoNotas       String?
+  orcamento          Json?
+  anexos             Json     @default("[]")
+  qa                 Json?
+  agendaPreferencial String?
+  log                Json     @default("[]")
+  clientId           String?
+  client             Client?  @relation(fields: [clientId], references: [id])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
 model Quote {
   id          String      @id @default(uuid())
   status      QuoteStatus @default(DRAFT)
@@ -123,6 +178,8 @@ model Quote {
   internalNote String?
   submittedAt DateTime?
   approvedAt  DateTime?
+  createdById String?
+  createdBy   User?       @relation("QuoteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 }

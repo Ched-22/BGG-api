@@ -9,6 +9,8 @@ import { ChecklistsModule } from './checklists/checklists.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { UsersModule } from './users/users.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { UsersModule } from './users/users.module';
     ChecklistsModule,
     NotificationsModule,
     QuotesModule,
+    InventoryModule,
+    TasksModule,
   ],
 })
 export class AppModule {}
