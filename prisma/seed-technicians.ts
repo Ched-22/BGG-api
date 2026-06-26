@@ -1,6 +1,7 @@
 import { PrismaClient, Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import * as dotenv from 'dotenv';
+import { parseLegacyPhone } from '../src/common/phone-parse';
 
 dotenv.config();
 
@@ -85,7 +86,7 @@ const TECHNICIANS = [
 const DEFAULT_PASSWORD = 'tecnico123';
 const STARTED_AT = new Date('2024-01-15');
 
-async function main() {
+export async function seedTechnicians(prisma: PrismaClient) {
   const plainPassword = process.env.SEED_TECHNICIAN_PASSWORD || DEFAULT_PASSWORD;
   const passwordHash = await bcrypt.hash(plainPassword, 10);
 
@@ -97,11 +98,13 @@ async function main() {
       where: { email: tech.email },
     });
 
+    const phoneFields = parseLegacyPhone(tech.phone);
     const data = {
       name: tech.name,
       role: Role.TECHNICIAN,
       active: true,
-      phone: tech.phone,
+      phoneCountryCode: phoneFields.countryCode,
+      phoneNationalNumber: phoneFields.nationalNumber,
       startedAt: STARTED_AT,
       skills: tech.skills,
       available: tech.available,
@@ -130,11 +133,19 @@ async function main() {
   console.log(`Seed technicians: ${created} created, ${updated} updated (${TECHNICIANS.length} total).`);
   console.log(`Login password (new users only): ${plainPassword}`);
   console.log('Emails: tecnico1@bgggarage.com … tecnico8@bgggarage.com');
+
+  return { created, updated, total: TECHNICIANS.length, password: plainPassword };
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+async function main() {
+  await seedTechnicians(prisma);
+}
+
+if (require.main === module) {
+  main()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(() => prisma.$disconnect());
+}

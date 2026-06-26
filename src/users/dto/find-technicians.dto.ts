@@ -23,11 +23,11 @@ export class FindTechniciansDto {
   page = 1;
 
   @IsOptional()
-  @Transform(({ value }) => (value != null && value !== '' ? Number(value) : 20))
+  @Transform(({ value }) => (value != null && value !== '' ? Number(value) : 15))
   @IsInt()
   @Min(1)
   @Max(100)
-  limit = 20;
+  limit = 15;
 
   @IsOptional()
   @IsString()
@@ -47,4 +47,9 @@ export class FindTechniciansDto {
   @Transform(({ value }) => toOptionalBoolean(value))
   @IsBoolean()
   includeInactive?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalBoolean(value))
+  @IsBoolean()
+  active?: boolean;
 }

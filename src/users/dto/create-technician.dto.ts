@@ -24,7 +24,11 @@ export class CreateTechnicianDto {
 
   @IsOptional()
   @IsString()
-  phone?: string;
+  phoneCountryCode?: string;
+
+  @IsOptional()
+  @IsString()
+  phoneNationalNumber?: string;
 
   @IsOptional()
   @IsDateString()
@@ -34,6 +38,11 @@ export class CreateTechnicianDto {
   @IsArray()
   @IsString({ each: true })
   skills?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  serviceIds?: string[];
 
   @IsOptional()
   @IsString()

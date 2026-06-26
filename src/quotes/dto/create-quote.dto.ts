@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsNumber, IsEnum, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsUUID, IsIn } from 'class-validator';
+import { CLIENT_PREFERRED_LANGUAGES } from '../../common/client-preferred-language';
 
 export enum QuoteStatus {
   DRAFT = 'DRAFT',
@@ -7,11 +8,18 @@ export enum QuoteStatus {
 }
 
 export class CreateQuoteDto {
+  @IsOptional()
+  @IsUUID()
+  clientId?: string;
+
   @IsString()
   clientName: string;
 
   @IsString()
-  clientPhone: string;
+  clientPhoneCountryCode: string;
+
+  @IsString()
+  clientPhoneNationalNumber: string;
 
   @IsString()
   @IsOptional()
@@ -19,6 +27,10 @@ export class CreateQuoteDto {
 
   @IsString()
   plate: string;
+
+  @IsString()
+  @IsOptional()
+  plateCountry?: string;
 
   @IsString()
   brand: string;
@@ -48,6 +60,11 @@ export class CreateQuoteDto {
   @IsOptional()
   discount?: number;
 
+  /** Valor total manual (substitui o calculado a partir dos snapshots). */
+  @IsNumber()
+  @IsOptional()
+  totalOverride?: number;
+
   @IsNumber()
   @IsOptional()
   total?: number;
@@ -63,4 +80,16 @@ export class CreateQuoteDto {
   @IsEnum(QuoteStatus)
   @IsOptional()
   status?: QuoteStatus;
+
+  @IsString()
+  @IsOptional()
+  linkedTaskDisplayId?: string;
+
+  @IsString()
+  @IsOptional()
+  currency?: string;
+
+  @IsOptional()
+  @IsIn([...CLIENT_PREFERRED_LANGUAGES])
+  clientPreferredLanguage?: string;
 }

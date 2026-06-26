@@ -30,12 +30,6 @@ export class TechniciansController {
     return this.techniciansService.findAll(dto);
   }
 
-  @Get('me')
-  @Roles(Role.TECHNICIAN)
-  findMe(@Req() req: { user: { id: string; email: string; role: Role } }) {
-    return this.techniciansService.findMe(req.user);
-  }
-
   @Get(':id')
   @Roles(Role.ADMIN, Role.TECHNICIAN)
   findOne(
