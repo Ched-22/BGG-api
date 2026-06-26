@@ -12,17 +12,26 @@ async function bootstrap() {
     transform: true,
   }));
 
+  const envOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.enableCors({
     origin: [
       'http://localhost:5173',
       'http://localhost:5174',
       'http://localhost:5175',
       'https://bgggarage.com',
+      ...(process.env.ADMIN_APP_URL ? [process.env.ADMIN_APP_URL] : []),
+      ...(process.env.MOBILE_APP_URL ? [process.env.MOBILE_APP_URL] : []),
+      ...envOrigins,
     ],
     credentials: true,
   });
 
-  await app.listen(3000);
-  console.log('🚀 API a correr em http://localhost:3000/api');
+  const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+  await app.listen(port, '0.0.0.0');
+  console.log(`🚀 API a correr na porta ${port} (prefixo /api)`);
 }
 bootstrap();

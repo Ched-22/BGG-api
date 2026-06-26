@@ -24,6 +24,7 @@ CREATE TABLE "Task" (
     "qa" JSONB,
     "agendaPreferencial" TEXT,
     "log" JSONB NOT NULL DEFAULT '[]',
+    "serviceCodes" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "clientId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,

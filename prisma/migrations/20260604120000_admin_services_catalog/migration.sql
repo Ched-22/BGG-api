@@ -41,9 +41,6 @@ CREATE TABLE "TechnicianService" (
 -- AlterTable
 ALTER TABLE "Quote" ADD COLUMN "serviceSnapshots" JSONB;
 
--- AlterTable
-ALTER TABLE "Task" ADD COLUMN "serviceCodes" TEXT[] DEFAULT ARRAY[]::TEXT[];
-
 -- CreateIndex
 CREATE UNIQUE INDEX "CatalogService_code_key" ON "CatalogService"("code");
 
