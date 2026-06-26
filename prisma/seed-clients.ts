@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as dotenv from 'dotenv';
+import { parseLegacyPhone } from '../src/common/phone-parse';
 
 dotenv.config();
 
@@ -27,10 +28,22 @@ const CLIENTS: Array<{ name: string; phone: string; email: string; status?: stri
   { name: 'Cliente 37', email: 'cliente37@exemplo.com', phone: '+5511992361104' },
 ];
 
-async function upsertClient(client: { name: string; phone: string; email: string; status?: string }) {
+function toPhoneFields(phone: string) {
+  const parsed = parseLegacyPhone(phone);
+  return {
+    phoneCountryCode: parsed.countryCode,
+    phoneNationalNumber: parsed.nationalNumber,
+  };
+}
+
+async function upsertClient(
+  prisma: PrismaClient,
+  client: { name: string; phone: string; email: string; status?: string },
+) {
+  const phoneFields = toPhoneFields(client.phone);
   const existing = await prisma.client.findFirst({
     where: {
-      OR: [{ email: client.email }, { name: client.name, phone: client.phone }],
+      OR: [{ email: client.email }, { name: client.name, phoneNationalNumber: phoneFields.phoneNationalNumber }],
     },
   });
 
@@ -39,7 +52,7 @@ async function upsertClient(client: { name: string; phone: string; email: string
       where: { id: existing.id },
       data: {
         name: client.name,
-        phone: client.phone,
+        ...phoneFields,
         email: client.email,
         status: client.status ?? 'Ativo',
       },
@@ -50,7 +63,7 @@ async function upsertClient(client: { name: string; phone: string; email: string
   await prisma.client.create({
     data: {
       name: client.name,
-      phone: client.phone,
+      ...phoneFields,
       email: client.email,
       status: client.status ?? 'Ativo',
     },
@@ -58,22 +71,32 @@ async function upsertClient(client: { name: string; phone: string; email: string
   return 'created' as const;
 }
 
-async function main() {
+export async function seedClients(prisma: PrismaClient) {
   let created = 0;
   let updated = 0;
 
   for (const client of CLIENTS) {
-    const result = await upsertClient(client);
+    const result = await upsertClient(prisma, client);
     if (result === 'created') created += 1;
     else updated += 1;
   }
 
-  console.log(`Seed clients: ${created} created, ${updated} updated (${CLIENTS.length} total).`);
+  console.log(`Clients seed: ${created} created, ${updated} updated.`);
+
+  return { created, updated, total: CLIENTS.length };
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+async function main() {
+  await seedClients(prisma);
+}
+
+if (require.main === module) {
+  main()
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

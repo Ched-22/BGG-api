@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
+import { FindClientsDto } from './dto/find-clients.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,9 +31,8 @@ export class ClientsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.TECHNICIAN)
-  findAll(@Query('search') search?: string) {
-    if (search) return this.clientsService.search(search);
-    return this.clientsService.findAll();
+  findAll(@Query() dto: FindClientsDto) {
+    return this.clientsService.findAll(dto);
   }
 
   @Get(':id')

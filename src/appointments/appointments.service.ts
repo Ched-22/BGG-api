@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Appointment, Role } from '@prisma/client';
+import { formatPhoneE164 } from '../common/phone-parse';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
@@ -52,7 +53,10 @@ export class AppointmentsService {
       },
     });
     await this.notificationsService.sendAppointmentConfirmation(
-      appointment.vehicle.client.phone,
+      formatPhoneE164(
+        appointment.vehicle.client.phoneCountryCode,
+        appointment.vehicle.client.phoneNationalNumber,
+      ),
       appointment.vehicle.client.name,
       appointment.vehicle.brand,
       appointment.vehicle.model,

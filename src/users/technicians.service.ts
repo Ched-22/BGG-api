@@ -8,13 +8,18 @@ import {
 import { AppointmentStatus, Prisma, Role, User } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { findTechnicianIdsWithScheduleConflict } from '../appointments/appointment-schedule.util';
+import { ServiceCatalogService } from '../catalog/catalog.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTechnicianDto } from './dto/create-technician.dto';
 import { FindTechniciansDto } from './dto/find-technicians.dto';
 import { UpdateTechnicianDto } from './dto/update-technician.dto';
 import {
   ACTIVE_APPOINTMENT_STATUSES,
+  ACTIVE_TASK_STATUSES,
   getCurrentMonthRange,
+  getTodayBounds,
+  getTodayDateString,
+  sumScheduledHours,
 } from './technician-metrics';
 import {
   buildStats,
@@ -28,7 +33,10 @@ type JwtUser = { id: string; email: string; role: Role };
 export class TechniciansService {
   private readonly logger = new Logger(TechniciansService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private catalogService: ServiceCatalogService,
+  ) {}
 
   async findAll(dto: FindTechniciansDto) {
     const conflictIds = await findTechnicianIdsWithScheduleConflict(this.prisma);
@@ -42,6 +50,11 @@ export class TechniciansService {
         orderBy: { name: 'asc' },
         skip,
         take: dto.limit,
+        include: {
+          technicianServices: {
+            include: { catalogService: { select: { id: true, code: true, name: true, serviceCategory: true, active: true } } },
+          },
+        },
       }),
     ]);
 
@@ -65,23 +78,35 @@ export class TechniciansService {
     this.assertCanRead(id, requester);
     const user = await this.findTechnicianOrThrow(id, {
       includeInactive: requester.role === Role.ADMIN,
+      includeServices: true,
     });
 
     const conflictIds = await findTechnicianIdsWithScheduleConflict(this.prisma);
     const stats = await this.getStatsForUser(user.id, conflictIds);
 
-    const appointments = await this.prisma.appointment.findMany({
-      where: { userId: id },
-      include: { vehicle: true },
-      orderBy: { scheduledAt: 'desc' },
-      take: 50,
-    });
+    const [appointments, assignedTasks] = await Promise.all([
+      this.prisma.appointment.findMany({
+        where: { userId: id },
+        include: { vehicle: true },
+        orderBy: { scheduledAt: 'desc' },
+        take: 50,
+      }),
+      this.prisma.task.findMany({
+        where: {
+          tecnico: { equals: user.name, mode: 'insensitive' },
+          status: { not: 'Cancelado' },
+        },
+        orderBy: [{ dataAgendada: 'desc' }, { createdAt: 'desc' }],
+        take: 50,
+      }),
+    ]);
 
-    return mapTechnicianDetail({ ...user, appointments }, stats);
+    return mapTechnicianDetail({ ...user, appointments }, stats, assignedTasks);
   }
 
-  async findMe(requester: JwtUser) {
-    return this.findOne(requester.id, requester);
+  async getStatsForTechnician(userId: string) {
+    const conflictIds = await findTechnicianIdsWithScheduleConflict(this.prisma);
+    return this.getStatsForUser(userId, conflictIds);
   }
 
   async create(dto: CreateTechnicianDto) {
@@ -99,7 +124,8 @@ export class TechniciansService {
         email: dto.email,
         password: hash,
         role: Role.TECHNICIAN,
-        phone: dto.phone,
+        phoneCountryCode: dto.phoneCountryCode,
+        phoneNationalNumber: dto.phoneNationalNumber,
         startedAt: dto.startedAt ? new Date(dto.startedAt) : undefined,
         skills: dto.skills ?? [],
         scheduleLabel: dto.scheduleLabel,
@@ -108,14 +134,23 @@ export class TechniciansService {
       },
     });
 
+    if (dto.serviceIds?.length) {
+      await this.catalogService.syncTechnicianServices(user.id, dto.serviceIds);
+    }
+
+    const withServices = await this.findTechnicianOrThrow(user.id, {
+      includeInactive: true,
+      includeServices: true,
+    });
+
     this.logger.log(`Technician created: ${user.id}`);
     const conflictIds = await findTechnicianIdsWithScheduleConflict(this.prisma);
     const stats = await this.getStatsForUser(user.id, conflictIds);
-    return mapTechnicianListItem(user, stats);
+    return mapTechnicianListItem(withServices, stats);
   }
 
   async update(id: string, dto: UpdateTechnicianDto) {
-    const user = await this.findTechnicianOrThrow(id);
+    const user = await this.findTechnicianOrThrow(id, { includeInactive: true });
 
     if (dto.email && dto.email !== user.email) {
       const existing = await this.prisma.user.findUnique({
@@ -129,7 +164,12 @@ export class TechniciansService {
     const data: Prisma.UserUpdateInput = {
       ...(dto.name !== undefined && { name: dto.name }),
       ...(dto.email !== undefined && { email: dto.email }),
-      ...(dto.phone !== undefined && { phone: dto.phone }),
+      ...(dto.phoneCountryCode !== undefined && {
+        phoneCountryCode: dto.phoneCountryCode,
+      }),
+      ...(dto.phoneNationalNumber !== undefined && {
+        phoneNationalNumber: dto.phoneNationalNumber,
+      }),
       ...(dto.startedAt !== undefined && {
         startedAt: dto.startedAt ? new Date(dto.startedAt) : null,
       }),
@@ -137,17 +177,27 @@ export class TechniciansService {
       ...(dto.scheduleLabel !== undefined && { scheduleLabel: dto.scheduleLabel }),
       ...(dto.workloadHours !== undefined && { workloadHours: dto.workloadHours }),
       ...(dto.available !== undefined && { available: dto.available }),
+      ...(dto.active !== undefined && { active: dto.active }),
       ...(dto.password && { password: await bcrypt.hash(dto.password, 10) }),
     };
 
     const updated = await this.prisma.user.update({ where: { id }, data });
+
+    if (dto.serviceIds !== undefined) {
+      await this.catalogService.syncTechnicianServices(id, dto.serviceIds);
+    }
+
+    const withServices = await this.findTechnicianOrThrow(id, {
+      includeInactive: true,
+      includeServices: true,
+    });
     const conflictIds = await findTechnicianIdsWithScheduleConflict(this.prisma);
     const stats = await this.getStatsForUser(updated.id, conflictIds);
-    return mapTechnicianListItem(updated, stats);
+    return mapTechnicianListItem(withServices, stats);
   }
 
   async deactivate(id: string) {
-    await this.findTechnicianOrThrow(id);
+    await this.findTechnicianOrThrow(id, { includeInactive: true });
     const updated = await this.prisma.user.update({
       where: { id },
       data: { active: false },
@@ -162,8 +212,13 @@ export class TechniciansService {
   ): Prisma.UserWhereInput {
     const where: Prisma.UserWhereInput = {
       role: Role.TECHNICIAN,
-      ...(dto.includeInactive ? {} : { active: true }),
     };
+
+    if (dto.active !== undefined) {
+      where.active = dto.active;
+    } else if (!dto.includeInactive) {
+      where.active = true;
+    }
 
     if (dto.search) {
       where.OR = [
@@ -187,8 +242,17 @@ export class TechniciansService {
 
   private async getStatsForUser(userId: string, conflictIds: string[]) {
     const { start, end } = getCurrentMonthRange();
+    const { start: dayStart, end: dayEnd } = getTodayBounds();
+    const today = getTodayDateString();
 
-    const [activeAppointmentsCount, completedCount] = await Promise.all([
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+
+    const [
+      activeAppointmentsCount,
+      completedCount,
+      activeTasksToday,
+      appointmentsTodayCount,
+    ] = await Promise.all([
       this.prisma.appointment.count({
         where: {
           userId,
@@ -202,27 +266,54 @@ export class TechniciansService {
           scheduledAt: { gte: start, lte: end },
         },
       }),
+      this.prisma.task.findMany({
+        where: {
+          tecnico: { equals: user.name, mode: 'insensitive' },
+          status: { in: ACTIVE_TASK_STATUSES },
+          dataAgendada: today,
+        },
+        select: { duracaoHoras: true },
+      }),
+      this.prisma.appointment.count({
+        where: {
+          userId,
+          status: { in: ACTIVE_APPOINTMENT_STATUSES },
+          scheduledAt: { gte: dayStart, lte: dayEnd },
+        },
+      }),
     ]);
 
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const scheduledHoursToday = sumScheduledHours(
+      activeTasksToday.map((task) => task.duracaoHoras),
+      appointmentsTodayCount,
+    );
+
     return buildStats(
       user,
       activeAppointmentsCount,
       completedCount,
       conflictIds.includes(userId),
+      scheduledHoursToday,
     );
   }
 
   private async findTechnicianOrThrow(
     id: string,
-    opts?: { includeInactive?: boolean },
-  ): Promise<User> {
+    opts?: { includeInactive?: boolean; includeServices?: boolean },
+  ) {
     const user = await this.prisma.user.findFirst({
       where: {
         id,
         role: Role.TECHNICIAN,
         ...(opts?.includeInactive ? {} : { active: true }),
       },
+      include: opts?.includeServices
+        ? {
+            technicianServices: {
+              include: { catalogService: { select: { id: true, code: true, name: true, serviceCategory: true, active: true } } },
+            },
+          }
+        : undefined,
     });
     if (!user) {
       throw new NotFoundException('Técnico não encontrado');

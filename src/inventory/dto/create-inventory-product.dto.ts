@@ -1,5 +1,6 @@
 import {
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Min,
@@ -29,4 +30,9 @@ export class CreateInventoryProductDto {
   @IsOptional()
   @IsString()
   supplier?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitCost?: number;
 }

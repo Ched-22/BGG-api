@@ -16,9 +16,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { QuotesService } from './quotes.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
+import { FindQuotesDto } from './dto/find-quotes.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 
-type AuthRequest = { user: { id: string; email: string; role: Role } };
+type AuthRequest = {
+  user: { id: string; email: string; role: Role; name?: string };
+};
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('quotes')
@@ -33,8 +36,8 @@ export class QuotesController {
 
   @Get()
   @Roles(Role.ADMIN, Role.TECHNICIAN)
-  findAll(@Query('status') status: string | undefined, @Req() req: AuthRequest) {
-    return this.quotesService.findAll(status, req.user);
+  findAll(@Query() dto: FindQuotesDto, @Req() req: AuthRequest) {
+    return this.quotesService.findAll(dto, req.user);
   }
 
   @Get(':id')
@@ -61,8 +64,26 @@ export class QuotesController {
 
   @Patch(':id/approve')
   @Roles(Role.ADMIN)
-  approve(@Param('id') id: string) {
-    return this.quotesService.approve(id);
+  approve(@Param('id') id: string, @Req() req: AuthRequest) {
+    return this.quotesService.approve(id, req.user);
+  }
+
+  @Patch(':id/send')
+  @Roles(Role.ADMIN)
+  send(@Param('id') id: string, @Req() req: AuthRequest) {
+    return this.quotesService.sendToClient(id, req.user);
+  }
+
+  @Patch(':id/resend')
+  @Roles(Role.ADMIN)
+  resend(@Param('id') id: string, @Req() req: AuthRequest) {
+    return this.quotesService.resendToClient(id, req.user);
+  }
+
+  @Post(':id/create-task')
+  @Roles(Role.ADMIN)
+  createTask(@Param('id') id: string, @Req() req: AuthRequest) {
+    return this.quotesService.createTaskFromQuote(id, req.user);
   }
 
   @Delete(':id')

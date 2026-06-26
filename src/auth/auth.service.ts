@@ -8,11 +8,15 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { Role, User } from '@prisma/client';
 import { OAuth2Client } from 'google-auth-library';
+import { createHash, randomBytes } from 'crypto';
+import { parseLegacyPhone } from '../common/phone-parse';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -50,12 +54,14 @@ export class AuthService {
     }
 
     const hash = await bcrypt.hash(dto.password, 10);
+    const parsedPhone = dto.phone ? parseLegacyPhone(dto.phone) : null;
     const user = await this.prisma.user.create({
       data: {
         name: dto.name.trim(),
         email,
         password: hash,
-        phone: dto.phone?.trim() || null,
+        phoneCountryCode: parsedPhone?.countryCode || null,
+        phoneNationalNumber: parsedPhone?.nationalNumber || null,
         role: Role.TECHNICIAN,
         active: true,
         available: true,
@@ -157,8 +163,90 @@ export class AuthService {
     return { message: 'Admin criado', email: user.email, password: 'admin123' };
   }
 
+  async requestPasswordReset(dto: ForgotPasswordDto) {
+    const message =
+      'Si existe una cuenta asociada a este correo, le enviaremos instrucciones para restablecer la contraseña.';
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    if (
+      !user ||
+      !user.password ||
+      !user.active ||
+      (user.role !== Role.ADMIN && user.role !== Role.TECHNICIAN)
+    ) {
+      return { message };
+    }
+
+    const token = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    await this.prisma.passwordResetToken.create({
+      data: { userId: user.id, tokenHash, expiresAt },
+    });
+
+    const baseUrl =
+      dto.client === 'mobile'
+        ? process.env.MOBILE_APP_URL || 'http://localhost:5174'
+        : process.env.ADMIN_APP_URL || 'http://localhost:5173';
+    const resetUrl = `${baseUrl.replace(/\/$/, '')}/?token=${token}`;
+
+    this.logger.log(`Password reset link (${dto.client}) for ${email}: ${resetUrl}`);
+
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      process.env.PASSWORD_RESET_DEBUG === 'true'
+    ) {
+      return { message, debugResetUrl: resetUrl };
+    }
+
+    return { message };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const tokenHash = createHash('sha256').update(dto.token).digest('hex');
+    const record = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (!record || record.usedAt || record.expiresAt < new Date()) {
+      throw new BadRequestException('Enlace no válido o caducado');
+    }
+
+    if (!record.user.active) {
+      throw new BadRequestException('Cuenta inactiva');
+    }
+
+    const hash = await bcrypt.hash(dto.password, 10);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: { password: hash },
+      }),
+      this.prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    return { message: 'Contraseña restablecida correctamente' };
+  }
+
   private buildAuthResponse(user: User) {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+    };
 
     return {
       access_token: this.jwt.sign(payload),

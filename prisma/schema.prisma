@@ -33,7 +33,8 @@ model User {
   googleId      String?  @unique
   role          Role     @default(TECHNICIAN)
   active        Boolean  @default(true)
-  phone         String?
+  phoneCountryCode    String?
+  phoneNationalNumber String?
   startedAt     DateTime?
   skills        String[] @default([])
   available     Boolean  @default(true)
@@ -42,13 +43,67 @@ model User {
   createdAt     DateTime @default(now())
   appointments  Appointment[]
   quotes        Quote[]  @relation("QuoteCreatedBy")
+  passwordResetTokens PasswordResetToken[]
+  inAppNotifications InAppNotification[]
+  technicianServices TechnicianService[]
+  employeeCost       EmployeeCost?
+}
+
+model InAppNotification {
+  id          String    @id @default(uuid())
+  recipientId String
+  recipient   User      @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  type        String
+  title       String
+  body        String
+  severity    String    @default("info")
+  readAt      DateTime?
+  resolvedAt  DateTime?
+  meta        Json?
+  action      Json?
+  createdAt   DateTime  @default(now())
+
+  @@index([recipientId, createdAt(sort: Desc)])
+  @@index([recipientId, readAt])
+}
+
+model WeeklyReportLog {
+  id         String   @id @default(uuid())
+  weekStart  String   @unique
+  weekEnd    String
+  metrics    Json
+  recipients String[]
+  sentAt     DateTime
+  createdAt  DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+enum ClientPreferredLanguage {
+  es
+  ca
+  en
+  ptBr
+  ptPt
 }
 
 model Client {
-  id          String    @id @default(uuid())
-  name        String
-  phone       String
-  email       String?
+  id                  String    @id @default(uuid())
+  name                String
+  phoneCountryCode    String
+  phoneNationalNumber String
+  email               String?
+  preferredLanguage   ClientPreferredLanguage @default(es)
   status      String    @default("Ativo")
   addressUnit String?
   street      String?
@@ -64,6 +119,7 @@ model Client {
 model Vehicle {
   id           String       @id @default(uuid())
   plate        String       @unique
+  plateCountry String       @default("ES")
   brand        String
   model        String
   year         Int
@@ -73,13 +129,48 @@ model Vehicle {
   appointments Appointment[]
 }
 
-model Service {
-  id          String  @id @default(uuid())
-  name        String
-  description String?
-  price       Float
-  duration    Int     // minutos
-  active      Boolean @default(true)
+enum ServiceCategory {
+  EXTERIOR
+  INTERIOR
+  COMPLETE
+  MOTO
+}
+
+model CatalogService {
+  id              String                @id @default(uuid())
+  code            String                @unique
+  name            String
+  description     String?
+  durationMinutes Int
+  serviceCategory ServiceCategory       @map("service_category")
+  active          Boolean               @default(true)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  prices          CatalogServicePrice[]
+  technicians     TechnicianService[]
+}
+
+model CatalogServicePrice {
+  id               String         @id @default(uuid())
+  catalogServiceId String
+  catalogService   CatalogService @relation(fields: [catalogServiceId], references: [id], onDelete: Cascade)
+  priceSmall       Float
+  priceMedium      Float
+  priceLarge       Float
+  effectiveFrom    DateTime       @default(now())
+  effectiveTo      DateTime?
+  createdAt        DateTime       @default(now())
+
+  @@index([catalogServiceId, effectiveFrom(sort: Desc)])
+}
+
+model TechnicianService {
+  userId           String
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  catalogServiceId String
+  catalogService   CatalogService @relation(fields: [catalogServiceId], references: [id], onDelete: Cascade)
+
+  @@id([userId, catalogServiceId])
 }
 
 model Appointment {
@@ -113,6 +204,27 @@ model ChecklistItem {
   checklist   Checklist @relation(fields: [checklistId], references: [id])
 }
 
+enum InspectionReportStatus {
+  DRAFT
+  PENDING_REVIEW
+  SENT_TO_CLIENT
+}
+
+model VehicleInspection {
+  id                   String                   @id @default(uuid())
+  appointmentId        String?                  @unique
+  taskDisplayId        String?                  @unique
+  entryData            Json                     @default("{}")
+  exitData             Json                     @default("{}")
+  entryFinalizedAt     DateTime?
+  exitFinalizedAt      DateTime?
+  reportStatus         InspectionReportStatus   @default(DRAFT)
+  submittedForReviewAt DateTime?
+  sentToClientAt       DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+}
+
 model InventoryProduct {
   id              String   @id @default(uuid())
   sku             String   @unique
@@ -121,10 +233,76 @@ model InventoryProduct {
   unit            String
   currentQuantity Int      @default(0)
   maxCapacity     Int
+  unitCost        Float    @default(0)
   supplier        String?
   active          Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  consumptions    InventoryConsumption[]
+  movements       InventoryMovement[]
+}
+
+enum InventoryMovementType {
+  CREATED
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  DEACTIVATED
+}
+
+model InventoryMovement {
+  id               String                 @id @default(uuid())
+  productId        String
+  product          InventoryProduct       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type             InventoryMovementType
+  quantityBefore   Int
+  quantityAfter    Int
+  quantityDelta    Int
+  unitCostSnapshot Float
+  note             String?
+  actorId          String?
+  actorName        String
+  occurredAt       DateTime               @default(now())
+  createdAt        DateTime               @default(now())
+
+  @@index([productId])
+  @@index([occurredAt])
+}
+
+model InventoryConsumption {
+  id               String           @id @default(uuid())
+  productId        String
+  product          InventoryProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantityConsumed Int
+  unitCostSnapshot Float
+  totalCost        Float
+  consumedAt       DateTime         @default(now())
+
+  @@index([consumedAt])
+  @@index([productId])
+}
+
+model FinanceExpense {
+  id         String   @id @default(uuid())
+  label      String
+  category   String
+  amount     Float
+  occurredAt DateTime
+  notes      String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([occurredAt])
+}
+
+model EmployeeCost {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monthlyCost   Float
+  effectiveFrom DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Task {
@@ -132,9 +310,12 @@ model Task {
   displayId          String   @unique
   projeto            String
   cliente            String
-  clienteEmail       String?
-  clienteTel         String?
+  clienteEmail               String?
+  clienteTelCountryCode      String?
+  clienteTelNationalNumber   String?
+  clientePreferredLanguage   ClientPreferredLanguage @default(es)
   servico            String
+  serviceCodes       String[] @default([])
   status             String   @default("Não agendado")
   descricao          String
   anotInternas       String?
@@ -142,6 +323,8 @@ model Task {
   endereco           Json?
   dataAgendada       String?
   horario            String?
+  clientDropoffDate  String?
+  clientDropoffTime  String?
   baia               Int?
   duracaoHoras       Float?
   tecnico            String?
@@ -161,25 +344,32 @@ model Task {
 model Quote {
   id          String      @id @default(uuid())
   status      QuoteStatus @default(DRAFT)
-  clientName  String
-  clientPhone String
+  clientName                   String
+  clientPhoneCountryCode       String
+  clientPhoneNationalNumber    String
   clientEmail String?
+  clientPreferredLanguage ClientPreferredLanguage @default(es)
   plate       String
+  plateCountry String     @default("ES")
   brand       String
   model       String
   year        Int
   color       String?
   km          Int?
   vehicleSize String?
-  services    Json        // array de serviços seleccionados
-  discount    Float       @default(0)
+  services         Json        // array de serviços seleccionados
+  serviceSnapshots Json?
+  discount         Float       @default(0)
   total       Float       @default(0)
+  currency    String      @default("EUR")
   notes       String?
   internalNote String?
   submittedAt DateTime?
   approvedAt  DateTime?
   createdById String?
   createdBy   User?       @relation("QuoteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  linkedTaskDisplayId String?
+  activityLog Json        @default("[]")
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 }

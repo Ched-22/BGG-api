@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsIn,
   IsInt,
   IsNumber,
   IsObject,
@@ -10,6 +11,9 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { TASK_LOG_ACTIONS } from '../task-log';
+
+const LOG_ACTION_VALUES = Object.values(TASK_LOG_ACTIONS);
 
 class TaskLogEntryDto {
   @IsString()
@@ -55,6 +59,14 @@ export class UpdateTaskDto {
   horario?: string | null;
 
   @IsOptional()
+  @IsString()
+  clientDropoffDate?: string | null;
+
+  @IsOptional()
+  @IsString()
+  clientDropoffTime?: string | null;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(99)
@@ -64,6 +76,10 @@ export class UpdateTaskDto {
   @IsNumber()
   @Min(0.5)
   duracaoHoras?: number | null;
+
+  @IsOptional()
+  @IsIn(['es', 'ca', 'en', 'ptBr', 'ptPt'])
+  clientePreferredLanguage?: string;
 
   @IsOptional()
   @IsObject()
@@ -77,4 +93,13 @@ export class UpdateTaskDto {
   @ValidateNested()
   @Type(() => TaskLogEntryDto)
   logEntry?: TaskLogEntryDto;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(LOG_ACTION_VALUES)
+  logAction?: string;
+
+  @IsOptional()
+  @IsObject()
+  logMeta?: Record<string, unknown>;
 }

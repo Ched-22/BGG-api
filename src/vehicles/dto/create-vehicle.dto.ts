@@ -5,6 +5,10 @@ export class CreateVehicleDto {
   plate: string;
 
   @IsString()
+  @IsOptional()
+  plateCountry?: string;
+
+  @IsString()
   brand: string;
 
   @IsString()

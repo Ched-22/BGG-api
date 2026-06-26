@@ -21,7 +21,7 @@ const INVENTORY_PRODUCTS = [
   { sku: 'QUI-505', name: 'Ósmose / spot remover 500ml', category: 'Químicos', unit: 'un', currentQuantity: 9, maxCapacity: 24, supplier: 'DetailChem BR' },
 ];
 
-async function main() {
+export async function seedInventory(prisma: PrismaClient) {
   let created = 0;
   let updated = 0;
 
@@ -63,11 +63,19 @@ async function main() {
 
   console.log(`Seed inventory: ${created} created, ${updated} updated (${INVENTORY_PRODUCTS.length} total).`);
   console.log(`${urgent} produto(s) abaixo de 20% da capacidade (compra urgente na dashboard).`);
+
+  return { created, updated, total: INVENTORY_PRODUCTS.length, urgent };
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+async function main() {
+  await seedInventory(prisma);
+}
+
+if (require.main === module) {
+  main()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(() => prisma.$disconnect());
+}

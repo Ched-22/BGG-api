@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import * as dotenv from 'dotenv';
+import { parseLegacyPhone } from '../src/common/phone-parse';
 
 dotenv.config();
 
@@ -58,12 +59,13 @@ const TASKS: TaskSeed[] = [
     tecnicoStatus: 'Confirmado',
     tecnicoNotas: 'Cliente preferiu chegada antes das 10h. Garagem subterrânea, vaga 42.',
     orcamento: {
-      valor: 6200,
+      valor: 1116,
       status: 'Aprovado',
       fatura: 'FAT-00829',
       metodo: 'Cartão de Crédito',
-      deposito: 1860,
-      saldo: 4340,
+      deposito: 334.8,
+      saldo: 781.2,
+      currency: 'EUR',
     },
     anexos: [
       { name: 'fotos-veículo-1.jpg', type: 'image' },
@@ -99,12 +101,13 @@ const TASKS: TaskSeed[] = [
     tecnico: '',
     tecnicoStatus: '—',
     orcamento: {
-      valor: 4280,
+      valor: 770.4,
       status: 'Pendente',
       fatura: '—',
       metodo: '—',
       deposito: 0,
-      saldo: 4280,
+      saldo: 770.4,
+      currency: 'EUR',
     },
     anexos: [{ name: 'estado-pintura.jpg', type: 'image' }],
     qa: { status: '—', notas: '', fotos: [], concluidoEm: '' },
@@ -134,12 +137,13 @@ const TASKS: TaskSeed[] = [
     tecnico: '',
     tecnicoStatus: '—',
     orcamento: {
-      valor: 1680,
+      valor: 302.4,
       status: 'Aprovado',
       fatura: 'FAT-00828',
       metodo: 'Pix',
-      deposito: 504,
-      saldo: 1176,
+      deposito: 90.72,
+      saldo: 211.68,
+      currency: 'EUR',
     },
     anexos: [],
     qa: { status: '—', notas: '', fotos: [], concluidoEm: '' },
@@ -173,12 +177,13 @@ const TASKS: TaskSeed[] = [
     tecnico: '',
     tecnicoStatus: '—',
     orcamento: {
-      valor: 7950,
+      valor: 1431,
       status: 'Aprovado',
       fatura: 'FAT-00824',
       metodo: 'Cartão de Crédito',
-      deposito: 2385,
-      saldo: 5565,
+      deposito: 429.3,
+      saldo: 1001.7,
+      currency: 'EUR',
     },
     anexos: [
       { name: 'veículo-frente.jpg', type: 'image' },
@@ -217,12 +222,13 @@ const TASKS: TaskSeed[] = [
     tecnicoStatus: 'Concluído',
     tecnicoNotas: 'Trabalho finalizado às 17h20. Cliente conferiu acabamento e aprovou visualmente.',
     orcamento: {
-      valor: 12400,
+      valor: 2232,
       status: 'Aprovado',
       fatura: 'FAT-00811',
       metodo: 'Cartão de Crédito',
-      deposito: 3720,
-      saldo: 8680,
+      deposito: 669.6,
+      saldo: 1562.4,
+      currency: 'EUR',
     },
     anexos: [
       { name: 'PPF-antes-1.jpg', type: 'image' },
@@ -267,12 +273,13 @@ const TASKS: TaskSeed[] = [
     tecnico: 'Técnico 5',
     tecnicoStatus: 'A caminho',
     orcamento: {
-      valor: 1980,
+      valor: 356.4,
       status: 'Aprovado',
       fatura: 'FAT-00821',
       metodo: 'Pix',
-      deposito: 594,
-      saldo: 1386,
+      deposito: 106.92,
+      saldo: 249.48,
+      currency: 'EUR',
     },
     anexos: [],
     qa: { status: '—', notas: '', fotos: [], concluidoEm: '' },
@@ -299,12 +306,13 @@ const TASKS: TaskSeed[] = [
     tecnico: '',
     tecnicoStatus: '—',
     orcamento: {
-      valor: 2380,
+      valor: 428.4,
       status: 'Pendente',
       fatura: '—',
       metodo: '—',
       deposito: 0,
-      saldo: 2380,
+      saldo: 428.4,
+      currency: 'EUR',
     },
     anexos: [],
     qa: { status: '—', notas: '', fotos: [], concluidoEm: '' },
@@ -335,12 +343,13 @@ const TASKS: TaskSeed[] = [
     tecnico: 'Técnico 2',
     tecnicoStatus: 'Confirmado',
     orcamento: {
-      valor: 1450,
+      valor: 261,
       status: 'Aprovado',
       fatura: 'FAT-00815',
       metodo: 'Cartão de Crédito',
-      deposito: 435,
-      saldo: 1015,
+      deposito: 78.3,
+      saldo: 182.7,
+      currency: 'EUR',
     },
     anexos: [],
     qa: { status: '—', notas: '', fotos: [], concluidoEm: '' },
@@ -369,12 +378,13 @@ const TASKS: TaskSeed[] = [
     tecnico: '',
     tecnicoStatus: '—',
     orcamento: {
-      valor: 2840,
+      valor: 511.2,
       status: 'Cancelado',
       fatura: '—',
       metodo: '—',
       deposito: 0,
       saldo: 0,
+      currency: 'EUR',
     },
     anexos: [],
     qa: { status: '—', notas: '', fotos: [], concluidoEm: '' },
@@ -386,7 +396,7 @@ const TASKS: TaskSeed[] = [
   },
 ];
 
-async function resolveClientId(clienteEmail: string, cliente: string) {
+async function resolveClientId(prisma: PrismaClient, clienteEmail: string, cliente: string) {
   const client = await prisma.client.findFirst({
     where: {
       OR: [{ email: clienteEmail }, { name: cliente }],
@@ -396,14 +406,16 @@ async function resolveClientId(clienteEmail: string, cliente: string) {
   return client?.id ?? null;
 }
 
-async function upsertTask(seed: TaskSeed) {
-  const clientId = await resolveClientId(seed.clienteEmail, seed.cliente);
+async function upsertTask(prisma: PrismaClient, seed: TaskSeed) {
+  const clientId = await resolveClientId(prisma, seed.clienteEmail, seed.cliente);
+  const phone = parseLegacyPhone(seed.clienteTel);
 
   const data = {
     projeto: seed.projeto,
     cliente: seed.cliente,
     clienteEmail: seed.clienteEmail,
-    clienteTel: seed.clienteTel,
+    clienteTelCountryCode: phone.countryCode,
+    clienteTelNationalNumber: phone.nationalNumber,
     servico: seed.servico,
     status: seed.status,
     descricao: seed.descricao,
@@ -444,12 +456,12 @@ async function upsertTask(seed: TaskSeed) {
   return 'created' as const;
 }
 
-async function main() {
+export async function seedTasks(prisma: PrismaClient) {
   let created = 0;
   let updated = 0;
 
   for (const task of TASKS) {
-    const result = await upsertTask(task);
+    const result = await upsertTask(prisma, task);
     if (result === 'created') created += 1;
     else updated += 1;
   }
@@ -459,11 +471,19 @@ async function main() {
     `Seed tasks: ${created} created, ${updated} updated (${TASKS.length} total). ` +
       `${scheduledToday} agendadas para hoje (${today}).`,
   );
+
+  return { created, updated, total: TASKS.length, scheduledToday };
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+async function main() {
+  await seedTasks(prisma);
+}
+
+if (require.main === module) {
+  main()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(() => prisma.$disconnect());
+}

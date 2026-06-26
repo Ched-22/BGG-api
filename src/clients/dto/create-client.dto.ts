@@ -1,4 +1,5 @@
 import { IsEmail, IsIn, IsOptional, IsString } from 'class-validator';
+import { CLIENT_PREFERRED_LANGUAGES } from '../../common/client-preferred-language';
 
 export const CLIENT_STATUSES = ['Ativo', 'Inativo', 'VIP'] as const;
 
@@ -7,11 +8,18 @@ export class CreateClientDto {
   name: string;
 
   @IsString()
-  phone: string;
+  phoneCountryCode: string;
+
+  @IsString()
+  phoneNationalNumber: string;
 
   @IsEmail()
   @IsOptional()
   email?: string;
+
+  @IsOptional()
+  @IsIn([...CLIENT_PREFERRED_LANGUAGES])
+  preferredLanguage?: string;
 
   @IsOptional()
   @IsIn(CLIENT_STATUSES)

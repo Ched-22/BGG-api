@@ -1,4 +1,5 @@
-import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MaxLength, IsIn } from 'class-validator';
+import { CLIENT_PREFERRED_LANGUAGES } from '../../common/client-preferred-language';
 
 export class CreateTaskDto {
   @IsString()
@@ -27,7 +28,11 @@ export class CreateTaskDto {
 
   @IsOptional()
   @IsString()
-  clienteTel?: string;
+  clienteTelCountryCode?: string;
+
+  @IsOptional()
+  @IsString()
+  clienteTelNationalNumber?: string;
 
   @IsOptional()
   @IsUUID()
@@ -65,4 +70,8 @@ export class CreateTaskDto {
   @IsOptional()
   @IsString()
   horario?: string;
+
+  @IsOptional()
+  @IsIn([...CLIENT_PREFERRED_LANGUAGES])
+  clientePreferredLanguage?: string;
 }

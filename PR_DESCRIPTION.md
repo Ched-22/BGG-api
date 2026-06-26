@@ -1,31 +1,38 @@
-# feat(auth): allow technician view access in admin with role guards
+## Summary
 
-## Feature Summary
+- Add weekly operational report via email for all active `ADMIN` users every Sunday 08:00 (`Europe/Lisbon`).
+- Metrics: quoted services, scheduled services, completed services, new clients, total revenue (EUR).
+- Expose `GET /api/reports/weekly/preview` and `POST /api/reports/weekly/send` (ADMIN only).
+- Staging override: `WEEKLY_REPORT_EMAIL_OVERRIDE=pedro@devdeals.app` until production SMTP is ready.
 
-Technicians can log into BGG-Admin and browse in read-only mode; quotes remain writable. API role guards enforce GET for technicians on tasks/inventory and restrict approve/delete on quotes.
+## API changes
 
-**ClickUp task:** N/A
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/api/reports/weekly/preview` | ADMIN | Preview metrics without sending |
+| POST | `/api/reports/weekly/send` | ADMIN | Send report (`dryRun`, `force` optional) |
 
-## Problem
+## New modules
 
-- Technicians were blocked from the admin console after login.
-- API returned 403 on tasks/inventory for technician JWTs.
-- No server-side restriction on quote approve/delete for non-admins.
+- `src/mail/` — SMTP / stub sender when override is set without SMTP
+- `src/weekly-reports/` — metrics, email template, cron, idempotency log
 
-## Implementation Details
+## Migration
 
-**API**
-- `GET /tasks`, `GET /inventory/products` → `ADMIN` + `TECHNICIAN`
-- `POST/PATCH/DELETE` on tasks, inventory → `ADMIN` only
-- `quotes` controller: `RolesGuard` — approve/delete `ADMIN` only; create/update/submit both roles
-- `clients`, `appointments`: GET both roles; writes `ADMIN` only
+- `WeeklyReportLog` table (`weekStart` unique) for send idempotency
 
-## Risk
+## Env vars (`.env.example`)
 
-**Low** — authorization tightening; no schema changes.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`
+- `WEEKLY_REPORT_CRON_ENABLED` (default `true`)
+- `WEEKLY_REPORT_EMAIL_OVERRIDE` (staging: `pedro@devdeals.app`)
 
 ## Test plan
 
-- [ ] Technician JWT: `GET /tasks` → 200, `PATCH /tasks/:id` → 403
-- [ ] Technician: `POST /quotes` → 201, `PATCH /quotes/:id/approve` → 403
-- [ ] Admin: full access unchanged
+- [ ] Run migration: `npx prisma migrate deploy`
+- [ ] `GET /api/reports/weekly/preview` as ADMIN — returns 5 KPIs
+- [ ] `POST /api/reports/weekly/send` with `{ "dryRun": true }` — no email, `sentAt: null`
+- [ ] `POST /api/reports/weekly/send` — email logged/sent to `pedro@devdeals.app` (with override)
+- [ ] Repeat send same week → `409 Conflict` (use `{ "force": true }` to resend)
+- [ ] `npm test` — weekly report unit specs pass
+- [ ] `npm run build` passes
