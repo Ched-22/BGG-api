@@ -115,17 +115,37 @@ export class UsersMeService {
     }
 
     if (fresh.role === Role.TECHNICIAN) {
-      const stats = await this.techniciansService.getStatsForTechnician(fresh.id);
+      const technician = await this.prisma.user.findUnique({
+        where: { id: fresh.id },
+        include: {
+          technicianServices: {
+            include: {
+              catalogService: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  serviceCategory: true,
+                  active: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!technician) throw new NotFoundException('Usuário não encontrado');
+
+      const stats = await this.techniciansService.getStatsForTechnician(technician.id);
       const upcoming = await this.prisma.appointment.findMany({
         where: {
-          userId: fresh.id,
+          userId: technician.id,
           status: { not: AppointmentStatus.CANCELLED },
         },
         include: { vehicle: true },
         orderBy: { scheduledAt: 'asc' },
         take: 5,
       });
-      return mapTechnicianProfile(fresh, stats, upcoming);
+      return mapTechnicianProfile(technician, stats, upcoming);
     }
 
     throw new ForbiddenException('Perfil não disponível');

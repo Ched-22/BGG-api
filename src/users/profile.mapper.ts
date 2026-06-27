@@ -24,15 +24,45 @@ type AppointmentWithVehicle = Appointment & {
   vehicle: { plate: string; brand: string; model: string };
 };
 
+type CatalogServiceSummary = {
+  id: string;
+  code: string;
+  name: string;
+  serviceCategory: string;
+  active: boolean;
+};
+
+type UserWithTechnicianServices = User & {
+  technicianServices?: Array<{
+    catalogService: CatalogServiceSummary;
+  }>;
+};
+
+function mapAssignedServices(user: UserWithTechnicianServices) {
+  const services = (user.technicianServices ?? []).map((row) => row.catalogService);
+  return {
+    serviceIds: services.map((s) => s.id),
+    services: services.map((s) => ({
+      id: s.id,
+      code: s.code,
+      name: s.name,
+      serviceCategory: s.serviceCategory,
+      active: s.active,
+    })),
+  };
+}
+
 export function mapTechnicianProfile(
-  user: User,
+  user: UserWithTechnicianServices,
   stats: TechnicianStats,
   upcomingAppointments: AppointmentWithVehicle[],
 ) {
+  const assigned = mapAssignedServices(user);
   return {
     ...baseProfileFields(user),
     startedAt: user.startedAt?.toISOString() ?? null,
     skills: user.skills,
+    ...assigned,
     available: user.available,
     scheduleLabel: user.scheduleLabel,
     workloadHours: user.workloadHours,
