@@ -3,7 +3,7 @@ import { IsIn, IsISO8601, IsOptional, IsString } from 'class-validator';
 export class FinanceSummaryQueryDto {
   @IsOptional()
   @IsString()
-  @IsIn(['month', 'quarter', 'year'])
+  @IsIn(['month', 'quarter', 'semester', 'year'])
   preset?: string;
 
   @IsOptional()

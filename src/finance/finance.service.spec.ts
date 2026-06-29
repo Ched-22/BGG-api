@@ -45,6 +45,7 @@ describe('FinanceService', () => {
 
   it('computes summary KPIs', async () => {
     const result = await service.getSummary({ preset: 'month' });
+    expect(result.preset).toBe('month');
     expect(result.totalRevenue).toBe(800);
     expect(result.completedServicesCount).toBe(2);
     expect(result.averageRevenue).toBe(400);
@@ -53,6 +54,37 @@ describe('FinanceService', () => {
     expect(result.grossProfit).toBe(755);
     expect(result.currency).toBe('EUR');
     expect(result.breakdown.fixed).toBe(200);
+  });
+
+  it('scales employee costs by preset period', async () => {
+    const month = await service.getSummary({ preset: 'month' });
+    const quarter = await service.getSummary({ preset: 'quarter' });
+    const semester = await service.getSummary({ preset: 'semester' });
+    const year = await service.getSummary({ preset: 'year' });
+
+    expect(month.periodStart).not.toBe(quarter.periodStart);
+    expect(quarter.periodStart).not.toBe(semester.periodStart);
+    expect(month.employeeCosts).toBeGreaterThan(0);
+    expect(quarter.employeeCosts).toBeGreaterThan(month.employeeCosts);
+    expect(semester.employeeCosts).toBeGreaterThan(quarter.employeeCosts);
+    expect(year.employeeCosts).toBeGreaterThan(semester.employeeCosts);
+  });
+
+  it('accepts custom date range', async () => {
+    const result = await service.getSummary({
+      periodStart: '2026-03-01',
+      periodEnd: '2026-05-31',
+    });
+    expect(result.preset).toBe('custom');
+    expect(result.periodStart).toBe('2026-03-01');
+    expect(result.periodEnd).toBe('2026-05-31');
+    expect(result.employeeCosts).toBe(3000);
+  });
+
+  it('rejects partial custom date range', async () => {
+    await expect(
+      service.getSummary({ periodStart: '2026-03-01' }),
+    ).rejects.toMatchObject({ status: 400 });
   });
 
   it('rejects non-technician employee cost', async () => {

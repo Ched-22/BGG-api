@@ -10,6 +10,7 @@ import { CreateFinanceExpenseDto, UpdateFinanceExpenseDto } from './dto/finance-
 import { UpsertEmployeeCostDto } from './dto/employee-cost.dto';
 import { FinanceSummaryQueryDto } from './dto/finance-summary-query.dto';
 import {
+  FINANCE_PRESETS,
   FinancePeriod,
   prorateMonthlyCost,
   resolveFinancePeriod,
@@ -23,12 +24,35 @@ export class FinanceService {
   constructor(private prisma: PrismaService) {}
 
   async getSummary(dto: FinanceSummaryQueryDto) {
-    const period = resolveFinancePeriod({
-      preset: dto.preset,
-      periodStart: dto.periodStart,
-      periodEnd: dto.periodEnd,
-    });
+    const customStart = dto.periodStart?.trim();
+    const customEnd = dto.periodEnd?.trim();
 
+    if (customStart || customEnd) {
+      if (!customStart || !customEnd) {
+        throw new BadRequestException('Informe data de início e fim do período');
+      }
+      const period = resolveFinancePeriod({
+        periodStart: customStart,
+        periodEnd: customEnd,
+      });
+      return this.buildSummaryResponse('custom', period);
+    }
+
+    const requestedPreset = dto.preset?.trim() || 'month';
+    if (!FINANCE_PRESETS.includes(requestedPreset as (typeof FINANCE_PRESETS)[number])) {
+      throw new BadRequestException(
+        `preset inválido (use ${FINANCE_PRESETS.join(', ')})`,
+      );
+    }
+
+    const period = resolveFinancePeriod({ preset: requestedPreset });
+    return this.buildSummaryResponse(requestedPreset, period);
+  }
+
+  private async buildSummaryResponse(
+    preset: string,
+    period: FinancePeriod,
+  ) {
     const [
       completedTasks,
       productCostAgg,
@@ -83,6 +107,7 @@ export class FinanceService {
     }
 
     return {
+      preset,
       periodStart: period.periodStart,
       periodEnd: period.periodEnd,
       currency: 'EUR',

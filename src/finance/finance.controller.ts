@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -16,7 +17,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UpsertEmployeeCostDto } from './dto/employee-cost.dto';
 import { CreateFinanceExpenseDto, UpdateFinanceExpenseDto } from './dto/finance-expense.dto';
-import { FinanceSummaryQueryDto } from './dto/finance-summary-query.dto';
 import { FinanceService } from './finance.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -26,8 +26,13 @@ export class FinanceController {
   constructor(private financeService: FinanceService) {}
 
   @Get('summary')
-  getSummary(@Query() dto: FinanceSummaryQueryDto) {
-    return this.financeService.getSummary(dto);
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate')
+  getSummary(
+    @Query('preset') preset?: string,
+    @Query('periodStart') periodStart?: string,
+    @Query('periodEnd') periodEnd?: string,
+  ) {
+    return this.financeService.getSummary({ preset, periodStart, periodEnd });
   }
 
   @Get('expenses')

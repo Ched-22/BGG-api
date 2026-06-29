@@ -3,6 +3,9 @@ import { DateTime } from 'luxon';
 
 const ZONE = 'Europe/Lisbon';
 
+export const FINANCE_PRESETS = ['month', 'quarter', 'semester', 'year'] as const;
+export type FinancePreset = (typeof FINANCE_PRESETS)[number];
+
 export type FinancePeriod = {
   periodStart: string;
   periodEnd: string;
@@ -29,31 +32,51 @@ export function resolveFinancePeriod(options: ResolveOptions = {}): FinancePerio
     return toPeriod(start, end);
   }
 
-  let start: DateTime;
-  let end: DateTime;
+  const bounds = resolvePresetBounds(now, preset);
+  return toPeriod(bounds.start, bounds.end);
+}
 
-  if (preset === 'quarter') {
-    start = now.startOf('quarter');
-    end = now.endOf('quarter');
-  } else if (preset === 'year') {
-    start = now.startOf('year');
-    end = now.endOf('year');
-  } else if (preset === 'month') {
-    start = now.startOf('month');
-    end = now.endOf('month');
-  } else {
-    throw new BadRequestException('preset inválido (use month, quarter ou year)');
+function resolvePresetBounds(now: DateTime, preset: string): { start: DateTime; end: DateTime } {
+  if (preset === 'month') {
+    return { start: now.startOf('month'), end: now.endOf('month') };
   }
 
-  return toPeriod(start, end);
+  if (preset === 'quarter') {
+    const quarterStartMonth = Math.floor((now.month - 1) / 3) * 3 + 1;
+    const start = now.set({ month: quarterStartMonth, day: 1 }).startOf('day');
+    const end = start.plus({ months: 3 }).minus({ days: 1 }).endOf('day');
+    return { start, end };
+  }
+
+  if (preset === 'semester') {
+    const yearStart = now.startOf('year');
+    if (now.month <= 6) {
+      return {
+        start: yearStart,
+        end: yearStart.plus({ months: 5 }).endOf('month'),
+      };
+    }
+    return {
+      start: yearStart.plus({ months: 6 }).startOf('month'),
+      end: now.endOf('year'),
+    };
+  }
+
+  if (preset === 'year') {
+    return { start: now.startOf('year'), end: now.endOf('year') };
+  }
+
+  throw new BadRequestException(`preset inválido (use ${FINANCE_PRESETS.join(', ')})`);
 }
 
 function toPeriod(start: DateTime, end: DateTime): FinancePeriod {
+  const zoneStart = start.startOf('day');
+  const zoneEnd = end.endOf('day');
   return {
-    periodStart: start.toISODate()!,
-    periodEnd: end.toISODate()!,
-    windowStart: start.toUTC().toJSDate(),
-    windowEnd: end.toUTC().toJSDate(),
+    periodStart: zoneStart.toISODate()!,
+    periodEnd: zoneEnd.toISODate()!,
+    windowStart: zoneStart.toUTC().toJSDate(),
+    windowEnd: zoneEnd.toUTC().toJSDate(),
   };
 }
 
