@@ -15,15 +15,20 @@ describe('FinanceService', () => {
     user: { findMany: jest.fn() },
   };
 
+  const financeRevenueService = {
+    aggregateRevenueForSummary: jest.fn(),
+  };
+
   let service: FinanceService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new FinanceService(prisma as never);
-    prisma.task.findMany.mockResolvedValue([
-      { orcamento: { valor: 500 } },
-      { orcamento: { valor: 300 } },
-    ]);
+    service = new FinanceService(prisma as never, financeRevenueService as never);
+    financeRevenueService.aggregateRevenueForSummary.mockResolvedValue({
+      totalRevenue: 800,
+      pendingRevenue: 200,
+      completedServicesCount: 2,
+    });
     prisma.inventoryConsumption.aggregate.mockResolvedValue({
       _sum: { totalCost: 45 },
     });
@@ -47,6 +52,7 @@ describe('FinanceService', () => {
     const result = await service.getSummary({ preset: 'month' });
     expect(result.preset).toBe('month');
     expect(result.totalRevenue).toBe(800);
+    expect(result.pendingRevenue).toBe(200);
     expect(result.completedServicesCount).toBe(2);
     expect(result.averageRevenue).toBe(400);
     expect(result.productCosts).toBe(45);

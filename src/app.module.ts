@@ -19,6 +19,7 @@ import { InAppNotificationsModule } from './in-app-notifications/in-app-notifica
 import { MailModule } from './mail/mail.module';
 import { WeeklyReportsModule } from './weekly-reports/weekly-reports.module';
 import { FinanceModule } from './finance/finance.module';
+import { TaskPaymentModule } from './task-payment/task-payment.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { FinanceModule } from './finance/finance.module';
     MediaModule,
     WeeklyReportsModule,
     FinanceModule,
+    TaskPaymentModule,
   ],
 })
 export class AppModule {}

@@ -4,11 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, Role } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFinanceExpenseDto, UpdateFinanceExpenseDto } from './dto/finance-expense.dto';
 import { UpsertEmployeeCostDto } from './dto/employee-cost.dto';
 import { FinanceSummaryQueryDto } from './dto/finance-summary-query.dto';
+import { FinanceRevenueService } from '../task-payment/finance-revenue.service';
 import {
   FINANCE_PRESETS,
   FinancePeriod,
@@ -21,7 +22,10 @@ const EXPENSE_CATEGORIES = ['fixed', 'variable', 'tax', 'other'] as const;
 
 @Injectable()
 export class FinanceService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private financeRevenueService: FinanceRevenueService,
+  ) {}
 
   async getSummary(dto: FinanceSummaryQueryDto) {
     const customStart = dto.periodStart?.trim();
@@ -54,13 +58,13 @@ export class FinanceService {
     period: FinancePeriod,
   ) {
     const [
-      completedTasks,
+      revenueAgg,
       productCostAgg,
       expenseAgg,
       expensesByCategory,
       employeeCosts,
     ] = await Promise.all([
-      this.loadCompletedTasks(period),
+      this.financeRevenueService.aggregateRevenueForSummary(period),
       this.prisma.inventoryConsumption.aggregate({
         where: {
           consumedAt: { gte: period.windowStart, lte: period.windowEnd },
@@ -85,10 +89,9 @@ export class FinanceService {
       this.computeEmployeeCosts(period),
     ]);
 
-    const totalRevenue = roundMoney(
-      completedTasks.reduce((sum, task) => sum + this.readOrcamentoValor(task.orcamento), 0),
-    );
-    const completedServicesCount = completedTasks.length;
+    const totalRevenue = roundMoney(revenueAgg.totalRevenue);
+    const pendingRevenue = roundMoney(revenueAgg.pendingRevenue);
+    const completedServicesCount = revenueAgg.completedServicesCount;
     const averageRevenue =
       completedServicesCount > 0
         ? roundMoney(totalRevenue / completedServicesCount)
@@ -112,6 +115,7 @@ export class FinanceService {
       periodEnd: period.periodEnd,
       currency: 'EUR',
       totalRevenue,
+      pendingRevenue,
       completedServicesCount,
       averageRevenue,
       productCosts,
@@ -242,28 +246,6 @@ export class FinanceService {
       );
     }
     return roundMoney(total);
-  }
-
-  private async loadCompletedTasks(period: FinancePeriod) {
-    return this.prisma.task.findMany({
-      where: {
-        status: 'Concluído',
-        updatedAt: {
-          gte: period.windowStart,
-          lte: period.windowEnd,
-        },
-      },
-      select: { orcamento: true },
-    });
-  }
-
-  private readOrcamentoValor(orcamento: Prisma.JsonValue | null): number {
-    if (!orcamento || typeof orcamento !== 'object' || Array.isArray(orcamento)) {
-      return 0;
-    }
-    const value = (orcamento as { valor?: unknown }).valor;
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : 0;
   }
 
   private mapExpense(row: {

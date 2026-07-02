@@ -18,12 +18,17 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { UpsertEmployeeCostDto } from './dto/employee-cost.dto';
 import { CreateFinanceExpenseDto, UpdateFinanceExpenseDto } from './dto/finance-expense.dto';
 import { FinanceService } from './finance.service';
+import { FinanceRevenueQueryDto } from '../task-payment/dto/finance-revenue-query.dto';
+import { FinanceRevenueService } from '../task-payment/finance-revenue.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 @Controller('finance')
 export class FinanceController {
-  constructor(private financeService: FinanceService) {}
+  constructor(
+    private financeService: FinanceService,
+    private financeRevenueService: FinanceRevenueService,
+  ) {}
 
   @Get('summary')
   @Header('Cache-Control', 'no-store, no-cache, must-revalidate')
@@ -66,5 +71,39 @@ export class FinanceController {
     @Body() dto: UpsertEmployeeCostDto,
   ) {
     return this.financeService.upsertEmployeeCost(userId, dto);
+  }
+
+  @Get('revenue/summary')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate')
+  getRevenueSummary(
+    @Query('preset') preset?: string,
+    @Query('periodStart') periodStart?: string,
+    @Query('periodEnd') periodEnd?: string,
+  ) {
+    return this.financeRevenueService.getSummary({
+      preset,
+      periodStart,
+      periodEnd,
+    });
+  }
+
+  @Get('revenue')
+  listRevenue(
+    @Query('preset') preset?: string,
+    @Query('periodStart') periodStart?: string,
+    @Query('periodEnd') periodEnd?: string,
+    @Query('paymentStatus') paymentStatus?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const dto: FinanceRevenueQueryDto = {
+      preset,
+      periodStart,
+      periodEnd,
+      paymentStatus,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    };
+    return this.financeRevenueService.listRevenue(dto);
   }
 }

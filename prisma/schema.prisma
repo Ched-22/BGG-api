@@ -339,6 +339,27 @@ model Task {
   client             Client?  @relation(fields: [clientId], references: [id])
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  payment            TaskPayment?
+}
+
+model TaskPayment {
+  id               String    @id @default(uuid())
+  taskId           String    @unique
+  task             Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  settlementStatus String    @default("pending")
+  paymentMethod    String?
+  iban             String?
+  amount           Float?
+  isInstallment    Boolean   @default(false)
+  installmentCount Int?
+  installmentsPaid Int       @default(0)
+  paidAt           DateTime?
+  notes            String?
+  updatedByUserId  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([settlementStatus])
 }
 
 model Quote {

@@ -16,6 +16,7 @@ export const TASK_LOG_ACTIONS = {
   REQUEST_REJECTED: 'REQUEST_REJECTED',
   QA_APPROVED: 'QA_APPROVED',
   CLIENT_PICKUP_NOTIFIED: 'CLIENT_PICKUP_NOTIFIED',
+  PAYMENT_UPDATED: 'PAYMENT_UPDATED',
 } as const;
 
 export type TaskLogAction =
@@ -95,6 +96,15 @@ function resolveLogLabel(
       return 'QA aprovado — tarefa concluída';
     case TASK_LOG_ACTIONS.CLIENT_PICKUP_NOTIFIED:
       return 'Cliente notificado — veículo disponível para retirada';
+    case TASK_LOG_ACTIONS.PAYMENT_UPDATED: {
+      const status = meta.settlementStatus === 'paid'
+        ? 'Pago'
+        : meta.settlementStatus === 'prepaid'
+          ? 'Pagamento antecipado'
+          : 'Pendente';
+      const method = meta.paymentMethod ? ` · ${String(meta.paymentMethod)}` : '';
+      return `Pagamento registado — ${status}${method}`;
+    }
     default:
       return action;
   }

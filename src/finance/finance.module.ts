@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
+import { TaskPaymentModule } from '../task-payment/task-payment.module';
 import { FinanceController } from './finance.controller';
 import { FinanceService } from './finance.service';
 
 @Module({
+  imports: [TaskPaymentModule],
   controllers: [FinanceController],
   providers: [FinanceService],
   exports: [FinanceService],
