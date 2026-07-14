@@ -11,12 +11,17 @@ import { OAuth2Client } from 'google-auth-library';
 import { createHash, randomBytes } from 'crypto';
 import { parseLegacyPhone } from '../common/phone-parse';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import {
+  buildPasswordResetEmailBodies,
+  buildPasswordResetEmailSubject,
+} from './password-reset-email';
 
 @Injectable()
 export class AuthService {
@@ -25,6 +30,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
+    private mailService: MailService,
   ) {}
 
   async login(dto: LoginDto) {
@@ -198,6 +204,21 @@ export class AuthService {
     const resetUrl = `${baseUrl.replace(/\/$/, '')}/?token=${token}`;
 
     this.logger.log(`Password reset link (${dto.client}) for ${email}: ${resetUrl}`);
+
+    try {
+      const { text, html } = buildPasswordResetEmailBodies(resetUrl);
+      await this.mailService.sendMail({
+        to: email,
+        subject: buildPasswordResetEmailSubject(),
+        text,
+        html,
+      });
+      this.logger.log(`Password reset e-mail sent to ${email}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password reset e-mail to ${email}: ${(error as Error).message}`,
+      );
+    }
 
     if (
       process.env.NODE_ENV !== 'production' &&

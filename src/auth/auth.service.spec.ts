@@ -33,7 +33,13 @@ describe('AuthService', () => {
       create: jest.Mock;
       update: jest.Mock;
     };
+    passwordResetToken: {
+      updateMany: jest.Mock;
+      create: jest.Mock;
+    };
   };
+
+  let mailService: { sendMail: jest.Mock };
 
   beforeEach(() => {
     prisma = {
@@ -43,8 +49,17 @@ describe('AuthService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      passwordResetToken: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        create: jest.fn().mockResolvedValue({ id: 'token1' }),
+      },
     };
-    service = new AuthService(prisma as never, { sign: mockSign } as never);
+    mailService = { sendMail: jest.fn().mockResolvedValue(undefined) };
+    service = new AuthService(
+      prisma as never,
+      { sign: mockSign } as never,
+      mailService as never,
+    );
     jest.clearAllMocks();
   });
 
@@ -97,6 +112,55 @@ describe('AuthService', () => {
       await expect(
         service.login({ email: 'g@test.com', password: 'any' }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+  });
+
+  describe('requestPasswordReset', () => {
+    const existingUser = {
+      id: 'u1',
+      email: 'admin@test.com',
+      password: 'hashed-password',
+      active: true,
+      role: Role.ADMIN,
+    };
+
+    it('sends a reset e-mail when the account exists', async () => {
+      prisma.user.findUnique.mockResolvedValue(existingUser);
+
+      const result = await service.requestPasswordReset({
+        email: 'admin@test.com',
+        client: 'admin',
+      });
+
+      expect(mailService.sendMail).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'admin@test.com' }),
+      );
+      expect(prisma.passwordResetToken.create).toHaveBeenCalled();
+      expect(result.message).toBeDefined();
+    });
+
+    it('returns the generic message without sending e-mail when account does not exist', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      const result = await service.requestPasswordReset({
+        email: 'unknown@test.com',
+        client: 'admin',
+      });
+
+      expect(mailService.sendMail).not.toHaveBeenCalled();
+      expect(result.message).toBeDefined();
+    });
+
+    it('does not throw when e-mail sending fails', async () => {
+      prisma.user.findUnique.mockResolvedValue(existingUser);
+      mailService.sendMail.mockRejectedValue(new Error('SMTP down'));
+
+      await expect(
+        service.requestPasswordReset({
+          email: 'admin@test.com',
+          client: 'admin',
+        }),
+      ).resolves.toEqual(expect.objectContaining({ message: expect.any(String) }));
     });
   });
 });

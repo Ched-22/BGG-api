@@ -22,6 +22,7 @@
     "seed:all": "npm run seed",
     "db:seed": "prisma db seed",
     "seed:admin": "ts-node --project prisma/tsconfig.seed.json prisma/seed-admin.ts",
+    "seed:new-admins": "ts-node --project prisma/tsconfig.seed.json prisma/seed-new-admins.ts",
     "seed:technicians": "ts-node --project prisma/tsconfig.seed.json prisma/seed-technicians.ts",
     "seed:inventory": "ts-node --project prisma/tsconfig.seed.json prisma/seed-inventory.ts",
     "seed:catalog": "ts-node --project prisma/tsconfig.seed.json prisma/seed-catalog.ts",
