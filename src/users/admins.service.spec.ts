@@ -11,6 +11,7 @@ describe('AdminsService', () => {
   let prisma: {
     user: {
       findUnique: jest.Mock;
+      findMany: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
     };
@@ -20,11 +21,27 @@ describe('AdminsService', () => {
     prisma = {
       user: {
         findUnique: jest.fn(),
+        findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
       },
     };
     service = new AdminsService(prisma as never);
+  });
+
+  describe('findAll', () => {
+    it('lists only ADMIN users', async () => {
+      prisma.user.findMany.mockResolvedValue([
+        { id: 'u1', name: 'Admin', email: 'admin@bgggarage.com', active: true, createdAt: new Date() },
+      ]);
+
+      const result = await service.findAll();
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { role: Role.ADMIN } }),
+      );
+      expect(result).toHaveLength(1);
+    });
   });
 
   it('creates a new admin with a generated temp password when the e-mail does not exist', async () => {

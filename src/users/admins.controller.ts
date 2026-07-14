@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -10,6 +10,12 @@ import { CreateAdminDto } from './dto/create-admin.dto';
 @Controller('users/admins')
 export class AdminsController {
   constructor(private adminsService: AdminsService) {}
+
+  @Get()
+  @Roles(Role.ADMIN)
+  findAll() {
+    return this.adminsService.findAll();
+  }
 
   @Post()
   @Roles(Role.ADMIN)

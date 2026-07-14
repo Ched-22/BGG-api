@@ -15,6 +15,22 @@ export class AdminsService {
 
   constructor(private prisma: PrismaService) {}
 
+  async findAll() {
+    const admins = await this.prisma.user.findMany({
+      where: { role: Role.ADMIN },
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        active: true,
+        createdAt: true,
+      },
+    });
+
+    return admins;
+  }
+
   async create(dto: CreateAdminDto) {
     const email = dto.email.trim().toLowerCase();
     const name = dto.name.trim();
