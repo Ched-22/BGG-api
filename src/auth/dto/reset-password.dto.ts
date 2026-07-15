@@ -14,7 +14,7 @@ export class ResetPasswordDto {
   @MaxLength(128)
   @Matches(PASSWORD_PATTERN, {
     message:
-      'password must include uppercase, lowercase, number and special character',
+      'A senha deve incluir letra maiúscula, minúscula, número e caractere especial',
   })
   password: string;
 }

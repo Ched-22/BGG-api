@@ -171,7 +171,7 @@ export class AuthService {
 
   async requestPasswordReset(dto: ForgotPasswordDto) {
     const message =
-      'Si existe una cuenta asociada a este correo, le enviaremos instrucciones para restablecer la contraseña.';
+      'Se existir uma conta associada a este e-mail, enviaremos instruções para redefinir a senha.';
     const email = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
 
@@ -217,6 +217,7 @@ export class AuthService {
     } catch (error) {
       this.logger.error(
         `Failed to send password reset e-mail to ${email}: ${(error as Error).message}`,
+        (error as Error).stack,
       );
     }
 
@@ -238,11 +239,11 @@ export class AuthService {
     });
 
     if (!record || record.usedAt || record.expiresAt < new Date()) {
-      throw new BadRequestException('Enlace no válido o caducado');
+      throw new BadRequestException('Link inválido ou expirado');
     }
 
     if (!record.user.active) {
-      throw new BadRequestException('Cuenta inactiva');
+      throw new BadRequestException('Conta inativa');
     }
 
     const hash = await bcrypt.hash(dto.password, 10);
@@ -258,7 +259,7 @@ export class AuthService {
       }),
     ]);
 
-    return { message: 'Contraseña restablecida correctamente' };
+    return { message: 'Senha redefinida com sucesso' };
   }
 
   private buildAuthResponse(user: User) {
