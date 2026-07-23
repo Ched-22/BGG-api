@@ -69,7 +69,7 @@ export class MailService {
   }
 
   async sendMail(input: SendMailInput): Promise<void> {
-    const from = process.env.MAIL_FROM?.trim() || 'Black Gold Garage <noreply@bgggarage.com>';
+    const from = process.env.MAIL_FROM?.trim() || 'Black Green Garage <noreply@bgggarage.com>';
     const transporter = this.getTransporter();
 
     if (transporter) {

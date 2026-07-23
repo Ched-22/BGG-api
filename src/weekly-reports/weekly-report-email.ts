@@ -24,7 +24,7 @@ export function buildEmailBodies(
     '',
     `Admin: ${adminUrl}`,
     `Gerado em ${generatedAt}`,
-    'Black Gold Garage',
+    'Black Green Garage',
   ];
 
   const text = lines.join('\n');
@@ -34,8 +34,8 @@ export function buildEmailBodies(
 <html lang="pt">
   <body style="font-family: Arial, sans-serif; color: #1a1a1a; line-height: 1.5; margin: 0; padding: 24px;">
     <div style="max-width: 560px; margin: 0 auto;">
-      <div style="background: #8b7348; color: #fff; padding: 16px 20px; border-radius: 4px 4px 0 0;">
-        <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.9;">Black Gold Garage</div>
+      <div style="background: #7A9C00; color: #fff; padding: 16px 20px; border-radius: 4px 4px 0 0;">
+        <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.9;">Black Green Garage</div>
         <h1 style="margin: 8px 0 0; font-size: 22px;">Relatório semanal</h1>
         <div style="margin-top: 4px; font-size: 14px;">${period}</div>
       </div>
@@ -48,7 +48,7 @@ export function buildEmailBodies(
           ${metricRow('Valor total recebido', formatEur(metrics.totalRevenueReceived), true)}
         </table>
         <p style="margin: 20px 0 0; font-size: 13px; color: #6b7280;">
-          <a href="${adminUrl}" style="color: #8b7348;">Abrir painel admin</a><br />
+          <a href="${adminUrl}" style="color: #7A9C00;">Abrir painel admin</a><br />
           Gerado em ${generatedAt}
         </p>
       </div>
@@ -60,7 +60,7 @@ export function buildEmailBodies(
 }
 
 function metricRow(label: string, value: string, highlight = false): string {
-  const color = highlight ? '#8b7348' : '#1a1a1a';
+  const color = highlight ? '#7A9C00' : '#1a1a1a';
   const weight = highlight ? '600' : '400';
   return `
     <tr>
