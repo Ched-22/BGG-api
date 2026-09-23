@@ -31,6 +31,31 @@
 $ npm install
 ```
 
+## Database seed
+
+Popula a base com dados de demonstração (admin, técnicos, clientes, estoque e tarefas):
+
+```bash
+# Após migrate (DATABASE_URL no .env)
+npm run db:seed
+# ou
+npm run seed
+```
+
+Ordem: admin → técnicos → clientes → estoque → tarefas (upsert — seguro reexecutar).
+
+| Comando | Descrição |
+|---------|-----------|
+| `npm run seed` | Seed completo |
+| `npm run db:seed` | Igual via `prisma db seed` |
+| `npm run seed:admin` | Só admin |
+| `npm run seed:technicians` | Só técnicos |
+| `npm run seed:clients` | Só clientes |
+| `npm run seed:inventory` | Só estoque |
+| `npm run seed:tasks` | Só tarefas |
+
+Credenciais padrão: `admin@bgggarage.com` / `admin123`; `tecnico1@bgggarage.com` … `tecnico8@bgggarage.com` / `tecnico123`.
+
 ## Compile and run the project
 
 ```bash
