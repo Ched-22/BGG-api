@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUUID, MaxLength, IsIn } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsUUID, MaxLength, IsIn, Min } from 'class-validator';
 import { CLIENT_PREFERRED_LANGUAGES } from '../../common/client-preferred-language';
 
 export class CreateTaskDto {
@@ -6,12 +6,31 @@ export class CreateTaskDto {
   @MaxLength(100)
   projeto: string;
 
+  @IsOptional()
   @IsString()
-  servico: string;
+  servico?: string;
 
+  @IsOptional()
   @IsString()
   @MaxLength(1000)
-  descricao: string;
+  descricao?: string;
+
+  @IsString()
+  plate: string;
+
+  @IsOptional()
+  @IsString()
+  plateCountry?: string;
+
+  @IsString()
+  brand: string;
+
+  @IsString()
+  model: string;
+
+  @IsInt()
+  @Min(1900)
+  year: number;
 
   @IsOptional()
   @IsString()

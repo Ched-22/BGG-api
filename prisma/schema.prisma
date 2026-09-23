@@ -318,6 +318,11 @@ model Task {
   serviceCodes       String[] @default([])
   status             String   @default("Não agendado")
   descricao          String
+  plate              String?
+  plateCountry       String?
+  brand              String?
+  model              String?
+  year               Int?
   anotInternas       String?
   anotPropriedade    String?
   endereco           Json?
